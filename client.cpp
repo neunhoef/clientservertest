@@ -49,7 +49,14 @@ int main(int argc, char* argv[]) {
     if (buffer == "quit") {
       break;
     }
-    int n = write(sockfd, buffer.c_str(), buffer.size());
+    char sizebuf[2];
+    sizebuf[0] = (char) buffer.size();
+    sizebuf[1] = 0;
+    int n = write(sockfd, sizebuf, 2);
+    if (n < 2) {
+      error("ERROR writing to socket");
+    }
+    n = write(sockfd, buffer.c_str(), buffer.size());
     if (n < 0) {
       error("ERROR writing to socket");
     }
@@ -59,7 +66,7 @@ int main(int argc, char* argv[]) {
       error("ERROR reading from socket");
     }
     rcvbuf[n] = 0;
-    std::cout << rcvbuf << std::endl;
+    std::cout << rcvbuf + 2 << std::endl;
   }
   close(sockfd);
   return 0;

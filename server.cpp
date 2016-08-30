@@ -4,6 +4,7 @@
 #include <cstring>
 #include <thread>
 #include <chrono>
+#include <climits>
 
 #include <unistd.h>
 #include <sys/types.h> 
@@ -15,22 +16,36 @@ void error(const char *msg) {
 }
 
 void work(int newsockfd) {
-  char buffer[256];
-  memset(buffer, 0, 256);
+  char buffer[16384];
+  memset(buffer, 0, 16384);
   while (true) {
-    int n = read(newsockfd,buffer,255);
-    if (n <= 0) {
-      close(newsockfd);
-      std::cout << "Connection closed." << std::endl;
-      std::this_thread::sleep_for(std::chrono::seconds(10));
-      std::cout << "Exiting." << std::endl;
-      return;
+    int pos = 0;
+    int expected = INT_MAX;
+    while (true) {
+      int n = read(newsockfd, buffer + pos, 16384 - pos);
+      if (n <= 0) {
+        close(newsockfd);
+        std::cout << "Connection closed." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+        std::cout << "Exiting." << std::endl;
+        return;
+      }
+      pos += n;
+      if (expected == INT_MAX && pos >= 2) {
+        expected = (int) buffer[1] * 128 + buffer[0];
+      }
+      if (pos >= expected) {
+        break;
+      }
     }
-    buffer[n] = 0;
-    std::cout << "Here is the message: " << buffer << std::endl;
-    n = write(newsockfd, "I got your message", 18);
-    if (n < 0) {
+    buffer[pos] = 0;
+    std::cout << "Here is the message of size " << pos << ": " 
+              << buffer + 2 << std::endl;
+    int n = write(newsockfd, "\x14\x00I got your message", 20);
+    if (n < 20) {
       error("ERROR writing to socket");
+      close(newsockfd);
+      return;
     }
   }
 }
