@@ -2,6 +2,8 @@
 #include <cstdlib>
 #include <string>
 #include <cstring>
+#include <thread>
+#include <chrono>
 
 #include <unistd.h>
 #include <sys/types.h> 
@@ -15,19 +17,22 @@ void error(const char *msg) {
 void work(int newsockfd) {
   char buffer[256];
   memset(buffer, 0, 256);
-  int n = read(newsockfd,buffer,255);
-  if (n < 0) {
-    error("ERROR reading from socket");
-    close(newsockfd);
-    return;
+  while (true) {
+    int n = read(newsockfd,buffer,255);
+    if (n <= 0) {
+      close(newsockfd);
+      std::cout << "Connection closed." << std::endl;
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+      std::cout << "Exiting." << std::endl;
+      return;
+    }
+    buffer[n] = 0;
+    std::cout << "Here is the message: " << buffer << std::endl;
+    n = write(newsockfd, "I got your message", 18);
+    if (n < 0) {
+      error("ERROR writing to socket");
+    }
   }
-  buffer[n] = 0;
-  std::cout << "Here is the message: " << buffer << std::endl;
-  n = write(newsockfd, "I got your message", 18);
-  if (n < 0) {
-    error("ERROR writing to socket");
-  }
-  close(newsockfd);
 }
 
 int main(int argc, char *argv[]) {
@@ -62,7 +67,7 @@ int main(int argc, char *argv[]) {
       error("ERROR on accept");
       return 0;
     }
-    work(newsockfd);
+    std::thread(work, newsockfd).detach();
   }
   close(sockfd);
   return 0; 

@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     std::cerr << "ERROR, no such host: " << argv[1] << std::endl;
     return 0;
   }
-  bzero((char *) &serv_addr, sizeof(serv_addr));
+  memset((char *) &serv_addr, 0, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
   memcpy((char *)&serv_addr.sin_addr.s_addr,
          (char *)server->h_addr, 
@@ -43,19 +43,24 @@ int main(int argc, char* argv[]) {
   if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
     error("ERROR connecting");
   }
-  std::cout << "Please enter the message: " << std::endl;
-  std::getline(std::cin, buffer);
-  int n = write(sockfd, buffer.c_str(), buffer.size());
-  if (n < 0) {
-    error("ERROR writing to socket");
+  while (true) {
+    std::cout << "Please enter the message: " << std::endl;
+    std::getline(std::cin, buffer);
+    if (buffer == "quit") {
+      break;
+    }
+    int n = write(sockfd, buffer.c_str(), buffer.size());
+    if (n < 0) {
+      error("ERROR writing to socket");
+    }
+    memset(rcvbuf, 0, 256);
+    n = read(sockfd, rcvbuf, 255);
+    if (n < 0) {
+      error("ERROR reading from socket");
+    }
+    rcvbuf[n] = 0;
+    std::cout << rcvbuf << std::endl;
   }
-  memset(rcvbuf, 0, 256);
-  n = read(sockfd, rcvbuf, 255);
-  if (n < 0) {
-    error("ERROR reading from socket");
-  }
-  rcvbuf[n] = 0;
-  std::cout << rcvbuf << std::endl;
   close(sockfd);
   return 0;
 }
