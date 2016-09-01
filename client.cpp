@@ -5,6 +5,9 @@
 #include <climits>
 #include <vector>
 #include <thread>
+#include <chrono>
+#include <mutex>
+#include <algorithm>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -27,7 +30,13 @@ int performRequest(int fd, std::string const& buf, char rcvbuf[16384]) {
   return res;
 }
 
+std::mutex outMutex;
+
 void work(char const* name, int portno, size_t nrReq, size_t sizeReq) {
+  std::vector<uint64_t> latencies;
+  latencies.reserve(nrReq);
+  std::chrono::high_resolution_clock clock;
+
   struct sockaddr_in serv_addr;
   struct hostent *server;
 
@@ -57,14 +66,32 @@ void work(char const* name, int portno, size_t nrReq, size_t sizeReq) {
   for (size_t i = 0; i < sizeReq; i++) {
     buffer.push_back((char) (i % 0xff));
   }
+  auto completeStartTime = clock.now();
   for (size_t i = 0; i < nrReq; i++) {
+    auto startTime = clock.now();
     int res = performRequest(sockfd, buffer, rcvbuf);
+    auto endTime = clock.now();
+    latencies.push_back(timeDiff(startTime, endTime));
     if (res < 0) {
       error("ERROR in request");
     }
     //std::cout << "Got result of length " << res << std::endl;
   }
+  auto completeEndTime = clock.now();
   close(sockfd);
+  std::sort(latencies.begin(), latencies.end());
+  uint64_t completeTime = timeDiff(completeStartTime, completeEndTime);
+  {
+    std::lock_guard<std::mutex> guard(outMutex);
+    std::cout << "Done " << nrReq << " in "
+        << completeTime / 1000 << " us,\n"
+        << "    avg: " << (double) completeTime / (double) nrReq << " ns"
+        << " 50%: " << latencies[nrReq * 50 / 100]
+        << " 95%: " << latencies[nrReq * 95 / 100]
+        << " 99%: " << latencies[nrReq * 99 / 100]
+        << " 99.9%: " << latencies[nrReq * 999 / 1000]
+        << std::endl;
+  }
 }
 
 int main(int argc, char* argv[]) {

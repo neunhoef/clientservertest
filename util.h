@@ -1,3 +1,10 @@
+typedef std::chrono::high_resolution_clock::time_point timePointType;
+typedef std::chrono::duration<uint64_t, std::nano>     nanoSecondsType;
+
+static inline uint64_t timeDiff (timePointType& a, timePointType& b) {
+      return std::chrono::duration_cast<nanoSecondsType>(b-a).count();
+}
+
 void error(const char *msg) {
   std::cout << msg << "\n" << strerror(errno) << std::endl;
 }
