@@ -25,7 +25,7 @@ int performRequest(int fd, std::string const& buf, char rcvbuf[16384]) {
   return res;
 }
 
-void work(char const* name, int portno) {
+void work(char const* name, int portno, size_t nrReq, size_t sizeReq) {
   struct sockaddr_in serv_addr;
   struct hostent *server;
 
@@ -51,28 +51,30 @@ void work(char const* name, int portno) {
   }
   std::string buffer;
   char rcvbuf[16384];
-  while (true) {
-    std::cout << "Please enter the message: " << std::endl;
-    std::getline(std::cin, buffer);
-    if (buffer == "quit") {
-      break;
-    }
+  buffer.reserve(sizeReq);
+  for (size_t i = 0; i < sizeReq; i++) {
+    buffer.push_back((char) (i % 0xff));
+  }
+  for (size_t i = 0; i < nrReq; i++) {
     int res = performRequest(sockfd, buffer, rcvbuf);
     if (res < 0) {
-      break;
+      error("ERROR in request");
     }
-    std::cout << rcvbuf + 2 << std::endl;
+    std::cout << "Got result of length " << res << std::endl;
   }
   close(sockfd);
 }
 
 int main(int argc, char* argv[]) {
-  if (argc < 3) {
-    std::cerr << "Usage " << argv[0] << " hostname port" << std::endl;
+  if (argc < 5) {
+    std::cerr << "Usage " << argv[0] << " hostname port nrReq sizeReq" 
+              << std::endl;
     exit(0);
   }
   int portno = std::stoi(argv[2]);
-  work(argv[1], portno);
+  size_t nrReq = std::stoul(argv[3]);
+  size_t sizeReq = std::stoul(argv[4]);
+  work(argv[1], portno, nrReq, sizeReq);
   return 0;
 }
 
