@@ -6,6 +6,9 @@
 #include <chrono>
 #include <climits>
 #include <atomic>
+#include <vector>
+#include <mutex>
+#include <algorithm>
 
 #include <unistd.h>
 #include <sys/types.h> 
@@ -17,45 +20,66 @@
 std::atomic<int> connCount(0);
 std::atomic<uint64_t> reqCount(0);
 
-void work(int newsockfd) {
+void work(int newsockfd, uint64_t latsize, size_t outSize) {
+  std::vector<uint64_t> latencies;
+  latencies.reserve(latsize);
+  std::chrono::high_resolution_clock clock;
+
   char buffer[16384];
   memset(buffer, 0, 16384);
+  char outBuffer[16384];
+  outBuffer[0] = (char) (outSize & 0xff);
+  outBuffer[1] = (char) ((outSize >> 8) & 0xff);
+  for (size_t i = 0; i < outSize; i++) {
+    outBuffer[i+2] = (char) (i & 0xff);
+  }
   std::cout << "New connection, currently " << ++connCount << " open."
             << std::endl;
-  uint64_t count = 0;
+  auto completeStartTime = clock.now();
   while (true) {
+    auto startTime = clock.now();
     int pos = getMsg(newsockfd, buffer);
     if (pos < 0) {
-      close(newsockfd);
-      std::cout << "Connection closed. Currently open: " << --connCount
-                << std::endl;
-      std::this_thread::sleep_for(std::chrono::seconds(1));
-      std::cout << "Exiting." << std::endl;
-      return;
+      break;
     }
     buffer[pos] = 0;
-    //std::cout << "Here is the message of size " << pos << ": " 
-    //          << buffer + 2 << std::endl;
-    if (++count >= 100000) {
-      reqCount += count;
-      count = 0;
-      std::cout << "Total requests: " << reqCount << std::endl;
-    }
-    int n = write(newsockfd, "\x14\x00I got your message", 20);
-    if (n < 20) {
+    int n = sendMsg(newsockfd, outBuffer, outSize + 2);
+    if (n < 0) {
       error("ERROR writing to socket");
-      std::cout << "Still open: " << --connCount << std::endl;
-      close(newsockfd);
-      return;
+      break;
     }
+    auto endTime = clock.now();
+    latencies.push_back(timeDiff(startTime, endTime));
+  }
+  auto completeEndTime = clock.now();
+  close(newsockfd);
+  std::sort(latencies.begin(), latencies.end());
+  uint64_t completeTime = timeDiff(completeStartTime, completeEndTime);
+  uint64_t nrReq = latencies.size();
+  {
+    std::lock_guard<std::mutex> guard(outMutex);
+    std::cout << "Done " << nrReq << " in "
+        << completeTime / 1000 << " us,";
+    if (nrReq > 0) {
+      std::cout
+        << "\n    avg: " << (double) completeTime / (double) nrReq << " ns"
+        << " 50%: " << latencies[nrReq * 50 / 100]
+        << " 95%: " << latencies[nrReq * 95 / 100]
+        << " 99%: " << latencies[nrReq * 99 / 100]
+        << " 99.9%: " << latencies[nrReq * 999 / 1000];
+    }
+    std::cout << "\n    Still open: " << --connCount << std::endl;
   }
 }
 
 int main(int argc, char *argv[]) {
-  if (argc < 2) {
-    std::cerr << "ERROR, no port provided" << std::endl;
+  if (argc < 4) {
+    std::cerr << "Usage: " << argv[0] << " PORT LATENCYBUFSIZE MSGSIZE"
+              << std::endl;
     return 1;
   }
+  uint64_t latBufSize = std::stoul(argv[2]);
+  size_t msgSize = std::stoul(argv[3]);
   socklen_t clilen;
   struct sockaddr_in serv_addr, cli_addr;
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -83,7 +107,7 @@ int main(int argc, char *argv[]) {
       error("ERROR on accept");
       return 0;
     }
-    std::thread(work, newsockfd).detach();
+    std::thread(work, newsockfd, latBufSize, msgSize).detach();
   }
   close(sockfd);
   return 0; 

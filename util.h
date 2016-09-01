@@ -5,6 +5,8 @@ static inline uint64_t timeDiff (timePointType& a, timePointType& b) {
       return std::chrono::duration_cast<nanoSecondsType>(b-a).count();
 }
 
+std::mutex outMutex;
+
 void error(const char *msg) {
   std::cout << msg << "\n" << strerror(errno) << std::endl;
 }

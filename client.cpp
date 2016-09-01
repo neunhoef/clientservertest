@@ -30,8 +30,6 @@ int performRequest(int fd, std::string const& buf, char rcvbuf[16384]) {
   return res;
 }
 
-std::mutex outMutex;
-
 void work(char const* name, int portno, size_t nrReq, size_t sizeReq) {
   std::vector<uint64_t> latencies;
   latencies.reserve(nrReq);
@@ -106,12 +104,19 @@ int main(int argc, char* argv[]) {
   size_t sizeReq = std::stoul(argv[4]);
   int nrThreads = std::stoi(argv[5]);
   std::vector<std::thread> threads;
+  std::chrono::high_resolution_clock clock;
+  auto start = clock.now();
   for (int i = 0; i < nrThreads; i++) {
     threads.push_back(std::thread(work, argv[1], portno, nrReq, sizeReq));
   }
   for (int i = 0; i < nrThreads; i++) {
     threads[i].join();
   }
+  auto finish = clock.now();
+  std::cout << "Performed " << nrThreads * nrReq
+            << " of size " << sizeReq << " for a total of "
+            << nrThreads * nrReq * sizeReq << " bytes in "
+            << timeDiff(start, finish) / 1000000.0 << " ms" << std::endl;
   return 0;
 }
 
