@@ -3,6 +3,8 @@
 #include <string>
 #include <cstring>
 #include <climits>
+#include <vector>
+#include <thread>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -60,21 +62,29 @@ void work(char const* name, int portno, size_t nrReq, size_t sizeReq) {
     if (res < 0) {
       error("ERROR in request");
     }
-    std::cout << "Got result of length " << res << std::endl;
+    //std::cout << "Got result of length " << res << std::endl;
   }
   close(sockfd);
 }
 
 int main(int argc, char* argv[]) {
-  if (argc < 5) {
-    std::cerr << "Usage " << argv[0] << " hostname port nrReq sizeReq" 
+  if (argc < 6) {
+    std::cerr << "Usage " << argv[0]
+              << " hostname port nrReq sizeReq nrThreads" 
               << std::endl;
     exit(0);
   }
   int portno = std::stoi(argv[2]);
   size_t nrReq = std::stoul(argv[3]);
   size_t sizeReq = std::stoul(argv[4]);
-  work(argv[1], portno, nrReq, sizeReq);
+  int nrThreads = std::stoi(argv[5]);
+  std::vector<std::thread> threads;
+  for (int i = 0; i < nrThreads; i++) {
+    threads.push_back(std::thread(work, argv[1], portno, nrReq, sizeReq));
+  }
+  for (int i = 0; i < nrThreads; i++) {
+    threads[i].join();
+  }
   return 0;
 }
 

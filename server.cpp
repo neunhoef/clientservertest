@@ -34,8 +34,8 @@ void work(int newsockfd) {
       return;
     }
     buffer[pos] = 0;
-    std::cout << "Here is the message of size " << pos << ": " 
-              << buffer + 2 << std::endl;
+    //std::cout << "Here is the message of size " << pos << ": " 
+    //          << buffer + 2 << std::endl;
     if (++count >= 100000) {
       reqCount += count;
       count = 0;
