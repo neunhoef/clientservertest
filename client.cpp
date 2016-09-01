@@ -113,10 +113,16 @@ int main(int argc, char* argv[]) {
     threads[i].join();
   }
   auto finish = clock.now();
+  uint64_t t = timeDiff(start, finish);
   std::cout << "Performed " << nrThreads * nrReq
             << " of size " << sizeReq << " for a total of "
             << nrThreads * nrReq * sizeReq << " bytes in "
-            << timeDiff(start, finish) / 1000000.0 << " ms" << std::endl;
+            << t / 1000000.0 << " ms" << std::endl;
+  std::cout << "This amounts to "
+    << (double) (nrThreads * nrReq) / (t / 1000000000.0)
+    << " request per second or "
+    << (double) (nrThreads * nrReq * sizeReq) / (t / 1000000000.0)
+    << " bytes per second." << std::endl;
   return 0;
 }
 
