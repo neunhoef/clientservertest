@@ -17,9 +17,6 @@
 
 #include "util.h"
 
-std::atomic<int> connCount(0);
-std::atomic<uint64_t> reqCount(0);
-
 void work(int newsockfd, uint64_t latsize, size_t outSize) {
   std::vector<uint64_t> latencies;
   latencies.reserve(latsize);
@@ -33,8 +30,7 @@ void work(int newsockfd, uint64_t latsize, size_t outSize) {
   for (size_t i = 0; i < outSize; i++) {
     outBuffer[i+2] = (char) (i & 0xff);
   }
-  std::cout << "New connection, currently " << ++connCount << " open."
-            << std::endl;
+  std::cout << "New connection." << std::endl;
   auto completeStartTime = clock.now();
   while (true) {
     int pos = getMsg(newsockfd, buffer);
@@ -72,7 +68,7 @@ void work(int newsockfd, uint64_t latsize, size_t outSize) {
         << " 99%: " << latencies[nrReq * 99 / 100]
         << " 99.9%: " << latencies[nrReq * 999 / 1000];
     }
-    std::cout << "\n    Still open: " << --connCount << std::endl;
+    std::cout << std::endl;
   }
 }
 
