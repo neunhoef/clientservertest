@@ -25,25 +25,19 @@ int performRequest(int fd, std::string const& buf, char rcvbuf[16384]) {
   return res;
 }
 
-int main(int argc, char* argv[]) {
+void work(char const* name, int portno) {
   struct sockaddr_in serv_addr;
   struct hostent *server;
 
-  std::string buffer;
-  if (argc < 3) {
-    std::cerr << "Usage " << argv[0] << " hostname port" << std::endl;
-    exit(0);
-  }
-  int portno = std::stoi(argv[2]);
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd < 0) {
     error("ERROR opening socket");
-    return 1;
+    return;
   }
-  server = gethostbyname(argv[1]);
+  server = gethostbyname(name);
   if (server == NULL) {
-    std::cerr << "ERROR, no such host: " << argv[1] << std::endl;
-    return 0;
+    std::cerr << "ERROR, no such host: " << name << std::endl;
+    return;
   }
   memset((char *) &serv_addr, 0, sizeof(serv_addr));
   serv_addr.sin_family = AF_INET;
@@ -53,8 +47,9 @@ int main(int argc, char* argv[]) {
   serv_addr.sin_port = htons(portno);
   if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) {
     error("ERROR connecting");
-    return 2;
+    return;
   }
+  std::string buffer;
   char rcvbuf[16384];
   while (true) {
     std::cout << "Please enter the message: " << std::endl;
@@ -69,6 +64,15 @@ int main(int argc, char* argv[]) {
     std::cout << rcvbuf + 2 << std::endl;
   }
   close(sockfd);
+}
+
+int main(int argc, char* argv[]) {
+  if (argc < 3) {
+    std::cerr << "Usage " << argv[0] << " hostname port" << std::endl;
+    exit(0);
+  }
+  int portno = std::stoi(argv[2]);
+  work(argv[1], portno);
   return 0;
 }
 
