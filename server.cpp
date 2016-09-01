@@ -5,45 +5,46 @@
 #include <thread>
 #include <chrono>
 #include <climits>
+#include <atomic>
 
 #include <unistd.h>
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-void error(const char *msg) {
-  std::cout << msg << "\n" << strerror(errno) << std::endl;
-}
+#include "util.h"
+
+std::atomic<int> connCount(0);
+std::atomic<uint64_t> reqCount(0);
 
 void work(int newsockfd) {
   char buffer[16384];
   memset(buffer, 0, 16384);
+  std::cout << "New connection, currently " << ++connCount << " open."
+            << std::endl;
+  uint64_t count = 0;
   while (true) {
-    int pos = 0;
-    int expected = INT_MAX;
-    while (true) {
-      int n = read(newsockfd, buffer + pos, 16384 - pos);
-      if (n <= 0) {
-        close(newsockfd);
-        std::cout << "Connection closed." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(10));
-        std::cout << "Exiting." << std::endl;
-        return;
-      }
-      pos += n;
-      if (expected == INT_MAX && pos >= 2) {
-        expected = (int) buffer[1] * 128 + buffer[0];
-      }
-      if (pos >= expected) {
-        break;
-      }
+    int pos = getMsg(newsockfd, buffer);
+    if (pos < 0) {
+      close(newsockfd);
+      std::cout << "Connection closed. Currently open: " << --connCount
+                << std::endl;
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+      std::cout << "Exiting." << std::endl;
+      return;
     }
     buffer[pos] = 0;
     std::cout << "Here is the message of size " << pos << ": " 
               << buffer + 2 << std::endl;
+    if (++count >= 100000) {
+      reqCount += count;
+      count = 0;
+      std::cout << "Total requests: " << reqCount << std::endl;
+    }
     int n = write(newsockfd, "\x14\x00I got your message", 20);
     if (n < 20) {
       error("ERROR writing to socket");
+      std::cout << "Still open: " << --connCount << std::endl;
       close(newsockfd);
       return;
     }
