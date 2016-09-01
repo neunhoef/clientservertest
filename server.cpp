@@ -37,12 +37,12 @@ void work(int newsockfd, uint64_t latsize, size_t outSize) {
             << std::endl;
   auto completeStartTime = clock.now();
   while (true) {
-    auto startTime = clock.now();
     int pos = getMsg(newsockfd, buffer);
     if (pos < 0) {
       break;
     }
     buffer[pos] = 0;
+    auto startTime = clock.now();
     int n = sendMsg(newsockfd, outBuffer, outSize + 2);
     if (n < 0) {
       error("ERROR writing to socket");
@@ -56,13 +56,17 @@ void work(int newsockfd, uint64_t latsize, size_t outSize) {
   std::sort(latencies.begin(), latencies.end());
   uint64_t completeTime = timeDiff(completeStartTime, completeEndTime);
   uint64_t nrReq = latencies.size();
+  uint64_t timeSum = 0;
+  for (size_t i = 0; i < latencies.size(); i++) {
+    timeSum += latencies[i];
+  }
   {
     std::lock_guard<std::mutex> guard(outMutex);
     std::cout << "Done " << nrReq << " in "
         << completeTime / 1000 << " us,";
     if (nrReq > 0) {
       std::cout
-        << "\n    avg: " << (double) completeTime / (double) nrReq << " ns"
+        << "\n    avg: " << (double) timeSum / (double) nrReq << " ns"
         << " 50%: " << latencies[nrReq * 50 / 100]
         << " 95%: " << latencies[nrReq * 95 / 100]
         << " 99%: " << latencies[nrReq * 99 / 100]
